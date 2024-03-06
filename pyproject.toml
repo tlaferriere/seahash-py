@@ -38,3 +38,6 @@ bench = [
     "typer[all]==0.9.0",
     "GitPython==3.1.42",
 ]
+
+[tool.maturin]
+python-source = "python"
