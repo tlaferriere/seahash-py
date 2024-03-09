@@ -71,5 +71,6 @@ docs/_build/
 # Pyenv
 .python-version
 
-# Test data for benchmark
+# Benchmark data
 test.bin
+bench_history.csv

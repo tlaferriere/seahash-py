@@ -1,16 +1,15 @@
 #! /usr/bin/env python3
-
+import csv
 import hashlib
 import logging
 import os
-import platform
-import time
+import timeit
+from enum import Enum
 from itertools import chain
-from typing import Callable
 from pathlib import Path
+from typing import Callable, TypedDict
 
-import pyperf
-
+import typer
 from seahash import SeaHash
 
 TEST_DATA_SIZE = 1024 * 1024 * 1024  # 1GB
@@ -45,22 +44,64 @@ def hashit(hashfunc: Callable, buffer: bytes | Path) -> Callable[[], None]:
     return _hashit
 
 
-def bench() -> None:
-    test_buffer, path = prepare_test_data(TEST_DATA_SIZE)
+Run = TypedDict(
+    "Run",
+    {
+        "name": str,
+        "in-memory time (s)": float,
+        "file time (s)": float,
+        "number of runs": float,
+    },
+)
 
-    runner = pyperf.Runner()
-    for (name, hashfunc) in chain(
-        map(lambda a: (a, lambda: hashlib.new(a)), hashlib.algorithms_available),
-        [("SeaHash", lambda: SeaHash())],
-    ):
+
+class Bench(Enum):
+    ALL = "all"
+    SEAHASH = "sea"
+    SHA1 = "sha1"
+
+
+def main(bench: Bench, number: int):
+    match bench:
+        case Bench.ALL:
+            hashes = chain(
+                map(
+                    lambda a: (a, lambda: hashlib.new(a)), hashlib.algorithms_available
+                ),
+                [("SeaHash", lambda: SeaHash())],
+            )
+        case Bench.SEAHASH:
+            hashes = [("SeaHash", lambda: SeaHash())]
+        case Bench.SHA1:
+            hashes = [("SHA1", lambda: hashlib.sha1())]
+        case _:
+            raise TypeError
+    history_csv = Path("bench_history.csv")
+
+    # Prepare the history csv file the first time it is used.
+    if not history_csv.exists():
+        with history_csv.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=Run.__annotations__.keys())
+            writer.writeheader()
+
+    test_buffer, path = prepare_test_data(TEST_DATA_SIZE)
+    for name, hashfunc in hashes:
         print(f"Measuring {name}...")
-        mem_benchmark = runner.bench_func(
-            f"{name} in-memory", hashit(hashfunc, test_buffer)
-        )
-        print(mem_benchmark.get_total_duration())
-        file_benchmark = runner.bench_func(f"{name} file digest", hashit(hashfunc, path))
-        print(file_benchmark.get_values())
+        mem_time = timeit.timeit(hashit(hashfunc, test_buffer), number=number)
+        print(f"{name} in-memory: {mem_time}")
+        file_time = timeit.timeit(hashit(hashfunc, path), number=number)
+        print(f"{name}  file digest: {file_time}")
+        print(f"File hash time to in-memory hash time ratio: {file_time / mem_time}")
+        run: Run = {
+            "name": name,
+            "number of runs": number,
+            "in-memory time (s)": mem_time,
+            "file time (s)": file_time,
+        }
+        with history_csv.open("a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=Run.__annotations__.keys())
+            writer.writerow(run)
 
 
 if __name__ == "__main__":
-    bench()
+    typer.run(main)
