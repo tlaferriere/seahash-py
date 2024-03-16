@@ -11,6 +11,7 @@ from typing import Callable, TypedDict
 
 import typer
 from seahash import SeaHash
+from git import Repo
 
 TEST_DATA_SIZE = 1024 * 1024 * 1024  # 1GB
 
@@ -48,8 +49,10 @@ Run = TypedDict(
     "Run",
     {
         "name": str,
-        "in-memory time (s)": float,
-        "file time (s)": float,
+        "commit": str,
+        "dirty": bool,
+        "1GB in-memory time (s)": float,
+        "1GB file time (s)": float,
         "number of runs": float,
     },
 )
@@ -62,21 +65,26 @@ class Bench(Enum):
 
 
 def main(bench: Bench, number: int):
+    seahash_lambda = ("SeaHash", lambda: SeaHash())
     match bench:
         case Bench.ALL:
             hashes = chain(
                 map(
                     lambda a: (a, lambda: hashlib.new(a)), hashlib.algorithms_available
                 ),
-                [("SeaHash", lambda: SeaHash())],
+                [seahash_lambda],
             )
         case Bench.SEAHASH:
-            hashes = [("SeaHash", lambda: SeaHash())]
+            hashes = [seahash_lambda]
         case Bench.SHA1:
             hashes = [("SHA1", lambda: hashlib.sha1())]
         case _:
             raise TypeError
-    history_csv = Path("bench_history.csv")
+    history_csv = Path("bench_history_v2.csv")
+
+    repo = Repo(".")
+    dirty = repo.is_dirty()
+    commit = repo.head.commit.hexsha
 
     # Prepare the history csv file the first time it is used.
     if not history_csv.exists():
@@ -90,13 +98,15 @@ def main(bench: Bench, number: int):
         mem_time = timeit.timeit(hashit(hashfunc, test_buffer), number=number)
         print(f"{name} in-memory: {mem_time}")
         file_time = timeit.timeit(hashit(hashfunc, path), number=number)
-        print(f"{name}  file digest: {file_time}")
+        print(f"{name} file digest: {file_time}")
         print(f"File hash time to in-memory hash time ratio: {file_time / mem_time}")
         run: Run = {
             "name": name,
+            "commit": commit,
+            "dirty": dirty,
             "number of runs": number,
-            "in-memory time (s)": mem_time,
-            "file time (s)": file_time,
+            "1GB in-memory time (s)": mem_time,
+            "1GB file time (s)": file_time,
         }
         with history_csv.open("a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=Run.__annotations__.keys())
