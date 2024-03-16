@@ -1,12 +1,14 @@
 use pyo3::prelude::*;
 
 mod inner {
+    use std::any::Any;
     use std::hash::Hasher;
 
     #[cfg(Py_3_11)]
     use pyo3::buffer::PyBuffer;
+    use pyo3::exceptions::PyTypeError;
     use pyo3::prelude::*;
-    use pyo3::types::PyBytes;
+    use pyo3::types::{PyBytes, PyType};
 
     /// Hash some bytes
     #[pyfunction]
@@ -53,10 +55,17 @@ mod inner {
         pub fn update(&mut self, py: Python, obj: &PyAny) -> PyResult<()> {
             if let Ok(buf) = obj.extract() {
                 py.allow_threads(|| self.inner.write(buf));
-            } else {
-                let vec = PyBuffer::get(obj)?.to_vec(py)?;
-                py.allow_threads(|| self.inner.write(vec.as_slice()));
-            }
+                return Ok(());
+            };
+            if obj.get_type().name()? != "memoryview" {
+                return Err(PyTypeError::new_err("Expected a bytes-like object."));
+            };
+            let py_buffer: PyBuffer<u8> = PyBuffer::get(obj)?;
+            let buf_ptr = py_buffer.buf_ptr() as *const u8;
+            let len = py_buffer.len_bytes();
+            let slice = unsafe { std::slice::from_raw_parts(buf_ptr, len) };
+            // We cannot unlock the GIL here since we are unsafely accessing the buffer of the memoryview owned by Python
+            self.inner.write(slice);
             Ok(())
         }
 

@@ -8,6 +8,8 @@
 ![PyPI - License](https://img.shields.io/pypi/l/seahash.svg)
 
 
+![logo](logo.png)
+
 Python bindings to [`seahash`](https://docs.rs/seahash/) - A blazingly fast, portable hash function with proven statistical guarantees.
 
 ## Installation
