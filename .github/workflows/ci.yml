@@ -40,9 +40,9 @@ jobs:
       - name: Install
         run: pip install '.[dev]'
       - name: format
-        run: ruff format --check tests/ seahash.pyi
+        run: ruff format --check tests/ __init__.pyii
       - name: lint
-        run: ruff check tests/ seahash.pyi
+        run: ruff check tests/ __init__.pyii
 
   arm:
     runs-on: ${{ matrix.os }}

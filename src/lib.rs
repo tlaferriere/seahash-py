@@ -1,14 +1,17 @@
 use pyo3::prelude::*;
+use pyo3::wrap_pymodule;
+
+#[cfg(feature = "bench")]
+mod bench_utils;
 
 mod inner {
-    use std::any::Any;
     use std::hash::Hasher;
 
     #[cfg(Py_3_11)]
     use pyo3::buffer::PyBuffer;
     use pyo3::exceptions::PyTypeError;
     use pyo3::prelude::*;
-    use pyo3::types::{PyBytes, PyType};
+    use pyo3::types::PyBytes;
 
     /// Hash some bytes
     #[pyfunction]
@@ -94,5 +97,8 @@ fn seahash(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(inner::hash, m)?)?;
     m.add_function(wrap_pyfunction!(inner::hash_seeded, m)?)?;
     m.add_class::<inner::SeaHash>()?;
+    if cfg!(feature = "bench") {
+        m.add_wrapped(wrap_pymodule!(bench_utils::bench_utils))?;
+    }
     Ok(())
 }

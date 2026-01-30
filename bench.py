@@ -11,6 +11,7 @@ from typing import Callable, TypedDict
 
 import typer
 from seahash import SeaHash
+import seahash.bench_utils
 from git import Repo
 
 TEST_DATA_SIZE = 1024 * 1024 * 1024  # 1GB
@@ -27,6 +28,7 @@ def prepare_test_data(size: int) -> (bytes, Path):
     path.write_bytes(buffer)
     logging.info(f"Finished preparing: {path}")
     return buffer, path
+
 
 
 def hashit(hashfunc: Callable, buffer: bytes | Path) -> Callable[[], None]:
@@ -92,7 +94,7 @@ def main(bench: Bench, number: int):
             writer = csv.DictWriter(f, fieldnames=Run.__annotations__.keys())
             writer.writeheader()
 
-    test_buffer, path = prepare_test_data(TEST_DATA_SIZE)
+    test_buffer, path = seahash.bench_utils.prepare_test_data(Path("test.bin"), TEST_DATA_SIZE)
     for name, hashfunc in hashes:
         print(f"Measuring {name}...")
         mem_time = timeit.timeit(hashit(hashfunc, test_buffer), number=number)

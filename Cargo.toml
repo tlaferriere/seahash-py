@@ -9,6 +9,9 @@ license = "MIT"
 name = "seahash"
 crate-type = ["cdylib"]
 
+[features]
+bench = []
+
 [dependencies]
 pyo3 = { version = "0.20.3", features = ["extension-module"] }
 seahash = "4.1.0"
